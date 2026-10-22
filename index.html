@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Evaluaciones de cultivo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -67,10 +68,29 @@
   .f-lleno:not(.pick){background-color:#e2f2dc !important}
   .pick.f-vacio button.pick-head{background-color:#fbe3df}
   .pick.f-lleno button.pick-head{background-color:#e2f2dc}
+  button.qr{margin-top:8px;padding:9px 14px;font-size:12px;background:var(--sage)}
+  #qrModal{position:fixed;inset:0;z-index:99;background:rgba(40,30,28,.88);display:flex;align-items:center;justify-content:center;padding:16px}
+  #qrModal.hidden{display:none}
+  .qrbox{background:var(--card);border-radius:22px;padding:16px;width:100%;max-width:420px}
+  .qrbox video{width:100%;border-radius:16px;background:#222;aspect-ratio:1/1;object-fit:cover}
+  .qrbox .qrst{font-size:13px;margin:10px 0;color:var(--mut);min-height:18px}
+  .qrbox .qrrow{display:flex;gap:8px} .qrrow button,.qrrow label{flex:1;text-align:center}
+  label.fotoqr{padding:13px 20px;border-radius:14px;background:var(--sage);font-size:13px;font-weight:600;cursor:pointer}
 </style>
 </head>
 <body>
 <div class="wrap">
+
+  <div id="qrModal" class="hidden">
+    <div class="qrbox">
+      <video id="qrVideo" playsinline muted></video>
+      <div class="qrst" id="qrEstado">Apunta la cámara al código QR…</div>
+      <div class="qrrow">
+        <label class="fotoqr">Hacer foto<input type="file" id="qrFoto" accept="image/*" capture="environment" hidden></label>
+        <button type="button" onclick="cerrarQR()">Cancelar</button>
+      </div>
+    </div>
+  </div>
 
   <div class="hero">
     <h1>Evaluaciones de cultivo</h1>
@@ -128,8 +148,8 @@
     {k:"tipoEvaluacion", t:"Tipo de evaluación", tipo:"select", fija:TIPOS}
   ];
 
-  const ENSAYO = {k:"ensayo", t:"Nombre del ensayo", tipo:"pick", lista:"ensayos", buscar:1, otros:1};
-  const UBICACION = {k:"ubicacion", t:"Ubicación", tipo:"pick", lista:"ubicaciones", buscar:1, otros:1};
+  const ENSAYO = {k:"ensayo", t:"Nombre del ensayo", tipo:"pick", lista:"ensayos", buscar:1, otros:1, qr:1};
+  const UBICACION = {k:"ubicacion", t:"Ubicación", tipo:"pick", lista:"ubicaciones", buscar:1, otros:1, qr:1};
 
   const BLOQUES = {
     "Siembra": {titulo:"Siembras", nombre:"siembra", campos:[
@@ -184,6 +204,7 @@
       const n = "p" + (++uid);
       inp = `<div class="pick" data-k="${c.k}" data-multi="${c.multi?1:0}">` +
         `<button type="button" class="pick-head" onclick="togglePick(this)"><span class="pick-val vacio">${PLACEHOLDER}</span><span class="chev">▾</span></button>` +
+        (c.qr ? `<button type="button" class="qr" onclick="escanearQR(this)">📷 Escanear QR</button>` : "") +
         `<div class="pick-panel hidden">` +
           (c.buscar ? `<input type="text" class="buscar" placeholder="🔍 Buscar en la lista..." oninput="filtrar(this)">` : "") +
           `<div class="opts">` + items.map(o =>
@@ -466,6 +487,91 @@
       ? (copiado ? "Se abre tu correo. La tabla es larga: está copiada, pégala en el cuerpo del mensaje."
                  : "Se abre tu correo, pero la tabla es larga y no se pudo copiar. Usa el botón Enviar.")
       : "Se abre tu aplicación de correo con la tabla en el cuerpo.";
+  }
+
+  // ---------- LECTOR DE QR ----------
+  let qrStream = null, qrTarget = null, qrRaf = 0, qrDet = null;
+  const $qr = id => document.getElementById(id);
+
+  async function escanearQR(btn){
+    qrTarget = btn.closest(".pick");
+    $qr("qrModal").classList.remove("hidden");
+    $qr("qrEstado").textContent = "Abriendo cámara…";
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("sin cámara");
+      qrStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}});
+      const v = $qr("qrVideo");
+      v.srcObject = qrStream; await v.play();
+      $qr("qrEstado").textContent = "Apunta la cámara al código QR…";
+      if ("BarcodeDetector" in window) { try { qrDet = new BarcodeDetector({formats:["qr_code"]}); } catch(e) { qrDet = null; } }
+      bucleQR();
+    } catch (e) {
+      $qr("qrVideo").style.display = "none";
+      $qr("qrEstado").textContent = "No se pudo abrir la cámara en directo. Usa «Hacer foto» para leer el QR.";
+    }
+  }
+
+  async function decodificar(fuente, ancho, alto){
+    if ("BarcodeDetector" in window) {
+      try { if (!qrDet) qrDet = new BarcodeDetector({formats:["qr_code"]});
+            const r = await qrDet.detect(fuente); if (r[0]) return r[0].rawValue; } catch(e) {}
+    }
+    if (window.jsQR) {
+      const c = document.createElement("canvas"); c.width = ancho; c.height = alto;
+      const x = c.getContext("2d", {willReadFrequently:true}); x.drawImage(fuente, 0, 0, ancho, alto);
+      const q = jsQR(x.getImageData(0, 0, ancho, alto).data, ancho, alto);
+      if (q) return q.data;
+    }
+    return null;
+  }
+
+  async function bucleQR(){
+    const v = $qr("qrVideo");
+    if (!qrStream) return;
+    if (v.readyState >= 2 && v.videoWidth) {
+      const t = await decodificar(v, v.videoWidth, v.videoHeight);
+      if (t) { aplicarQR(t); return; }
+    }
+    qrRaf = setTimeout(bucleQR, 200);
+  }
+
+  $qr("qrFoto").addEventListener("change", async e => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    $qr("qrEstado").textContent = "Leyendo imagen…";
+    try {
+      const bmp = await createImageBitmap(f);
+      const k = Math.min(1, 1400 / Math.max(bmp.width, bmp.height));
+      const t = await decodificar(bmp, Math.round(bmp.width * k), Math.round(bmp.height * k));
+      if (t) aplicarQR(t); else $qr("qrEstado").textContent = "No se detectó ningún QR. Inténtalo de nuevo con la foto más cerca y enfocada.";
+    } catch (err) { $qr("qrEstado").textContent = "No se pudo leer la imagen."; }
+  });
+
+  function cerrarQR(){
+    clearTimeout(qrRaf);
+    if (qrStream) { qrStream.getTracks().forEach(t => t.stop()); qrStream = null; }
+    $qr("qrVideo").srcObject = null; $qr("qrVideo").style.display = "";
+    $qr("qrModal").classList.add("hidden");
+  }
+
+  // Selecciona en la lista el valor leído; si no está, lo escribe en "Otro"
+  function aplicarQR(texto){
+    const txt = String(texto).trim(), pick = qrTarget;
+    cerrarQR();
+    if (!pick) return;
+    const norm = x => x.trim().toLowerCase();
+    const op = [...pick.querySelectorAll(".opts input")].find(i => norm(i.value) === norm(txt));
+    if (op) {
+      const o = pick.querySelector(".otra"); if (o && pick.dataset.multi === "0") o.value = "";
+      op.checked = true;
+      op.dispatchEvent(new Event("change", {bubbles:true}));
+    } else {
+      const o = pick.querySelector(".otra");
+      if (!o) { alert("QR leído: " + txt + "\nNo está en la lista."); return; }
+      if (pick.dataset.multi === "1" && o.value.trim()) o.value = o.value.trim() + ", " + txt; else o.value = txt;
+      pick.querySelectorAll(".opts input[type=radio]").forEach(r => r.checked = false);
+      o.dispatchEvent(new Event("input", {bubbles:true}));
+    }
   }
 
   async function enviar(){
