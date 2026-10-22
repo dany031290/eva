@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evaluaciones de cultivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#eeece1;--card:#f8f7f1;--field:#e8e5d8;--ink:#4a3b38;--mut:#8a7f78;--teal:#51758a;--mustard:#e1ab4a;--sage:#d9dcb6;--olive:#6b7a45;--terra:#b2685a;--blush:#f3d8ce}
+  *{box-sizing:border-box}
+  body{font-family:'Montserrat',system-ui,sans-serif;background:var(--bg);margin:0;padding:18px 14px 44px;color:var(--ink)}
+  .wrap{max-width:640px;margin:0 auto}
+
+  .hero{position:relative;padding:14px 0 10px;min-height:150px}
+  .hero h1{font-weight:700;font-size:32px;line-height:1.08;margin:0 0 12px;max-width:78%;letter-spacing:-.4px}
+  .hero p{font-size:13px;line-height:1.5;color:var(--mut);margin:0 0 14px;max-width:62%}
+  .hero .rule{width:44px;height:4px;border-radius:4px;background:var(--mustard)}
+  .hero svg{position:absolute;right:-6px;bottom:-6px;width:130px;height:auto}
+
+  .card{background:var(--card);border-radius:22px;padding:20px 16px;margin-bottom:16px}
+  h2{font-weight:700;font-size:17px;margin:0 0 2px}
+  label.l{display:block;font-size:12px;font-weight:600;color:var(--mut);margin-top:18px}
+  .help{font-size:12px;color:var(--mut);margin:3px 0 4px}
+
+  input[type=text],input[type=password],input[type=date],select,textarea{
+    width:100%;padding:13px 14px;font:inherit;font-size:15px;border:none;border-radius:14px;background:var(--field);color:var(--ink);margin-top:6px}
+  input::placeholder,textarea::placeholder{color:#a3998f}
+  input:focus,select:focus,textarea:focus,button.pick-head:focus{outline:2px solid var(--mustard);outline-offset:0}
+  textarea{min-height:84px;resize:vertical}
+  select{appearance:none;-webkit-appearance:none;padding-right:38px;background-repeat:no-repeat;background-position:right 14px center;
+    background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8"><path d="M1 1l5 5 5-5" fill="none" stroke="%2351758a" stroke-width="2" stroke-linecap="round"/></svg>')}
+
+  button{font:inherit;font-size:13px;font-weight:600;padding:13px 20px;border:none;border-radius:14px;background:var(--sage);color:var(--ink);cursor:pointer;transition:filter .15s}
+  button:hover{filter:brightness(.95)}
+  button.prim{background:var(--teal);color:#fff}
+  button.del{padding:7px 12px;font-size:12px;background:var(--blush);color:var(--terra)}
+  button.full{width:100%} button:disabled{opacity:.5;cursor:default}
+
+  .pick{margin-top:6px;position:relative}
+  button.pick-head{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;
+    font-size:15px;font-weight:400;padding:13px 14px;background:var(--field);color:var(--ink)}
+  button.pick-head:hover{filter:none}
+  .pick-val{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pick-val.vacio{color:#a3998f}
+  .chev{color:var(--teal);font-size:14px;transition:transform .15s}
+  .pick.abierto .chev{transform:rotate(180deg)}
+  .pick-panel{margin-top:6px;border-radius:16px;background:#fdfcf8;padding:8px;box-shadow:0 8px 22px rgba(74,59,56,.12)}
+  .pick-panel .buscar{margin:0 0 6px}
+  .opts{max-height:190px;overflow:auto}
+  .chk{display:flex;align-items:center;gap:10px;padding:9px 8px;font-size:14px;border-radius:10px}
+  .chk:hover{background:var(--field)}
+  .chk:has(input:checked){background:var(--sage)}
+  .chk input{width:19px;height:19px;flex:none;accent-color:var(--teal)}
+  .otra{margin-top:8px}
+
+  .err:not(.pick){box-shadow:0 0 0 2px var(--terra);background:var(--blush)}
+  .pick.err button.pick-head{box-shadow:0 0 0 2px var(--terra);background:var(--blush)}
+
+  .entrada{background:#f0eee4;border-radius:18px;padding:14px;margin:14px 0}
+  .head{display:flex;justify-content:space-between;align-items:center}
+  .head b{font-weight:700;font-size:15px;color:var(--teal)}
+  .msg{margin-top:14px;font-size:13px} .error{color:var(--terra)} .ok{color:var(--olive);font-weight:600}
+  .hidden{display:none}
+  @media (max-width:420px){.hero h1{font-size:27px}.hero svg{width:105px}}
+  .f-vacio:not(.pick){background-color:#fbe3df !important}
+  .f-lleno:not(.pick){background-color:#e2f2dc !important}
+  .pick.f-vacio button.pick-head{background-color:#fbe3df}
+  .pick.f-lleno button.pick-head{background-color:#e2f2dc}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <h1>Evaluaciones de cultivo</h1>
+    <p>Siembras, evaluaciones, objetivos de cultivo e incidencias.</p>
+    <div class="rule"></div>
+    <!-- Ilustración propia: suculenta -->
+    <svg viewBox="0 0 140 120" aria-hidden="true">
+      <g transform="translate(70,88)">
+        <ellipse cx="0" cy="-34" rx="12" ry="34" transform="rotate(-75)" fill="#a7b283"/>
+        <ellipse cx="0" cy="-34" rx="12" ry="34" transform="rotate(75)" fill="#a7b283"/>
+        <ellipse cx="0" cy="-36" rx="13" ry="36" transform="rotate(-48)" fill="#8f9a6a"/>
+        <ellipse cx="0" cy="-36" rx="13" ry="36" transform="rotate(48)" fill="#8f9a6a"/>
+        <ellipse cx="0" cy="-38" rx="13" ry="38" transform="rotate(-22)" fill="#77834f"/>
+        <ellipse cx="0" cy="-38" rx="13" ry="38" transform="rotate(22)" fill="#77834f"/>
+        <ellipse cx="0" cy="-40" rx="13" ry="40" fill="#b9c196"/>
+      </g>
+      <path d="M38 88 h64 l-8 28 h-48 z" fill="#b2685a"/>
+    </svg>
+  </div>
+
+  <div id="login" class="card">
+    <h2>Acceso</h2>
+    <input type="text" id="user" placeholder="Usuario" autocomplete="off" autocapitalize="none">
+    <input type="password" id="pass" placeholder="Contraseña" autocomplete="off">
+    <button class="prim full" style="margin-top:14px" id="btnEntrar" onclick="entrar()">Entrar</button>
+    <div id="loginMsg" class="msg"></div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="card" id="general">
+      <h2>Datos generales</h2>
+      <div id="generalCampos"></div>
+    </div>
+    <div id="bloques"></div>
+    <button class="prim full" id="btnEnviar" onclick="enviar()">Enviar</button>
+    <button class="full" id="btnCorreo" style="margin-top:10px" onclick="redactarCorreo()">Redactar correo</button>
+    <div id="envMsg" class="msg"></div>
+  </div>
+</div>
+
+<script>
+  // URL del flujo 1 (valida usuario/contraseña)
+  const FLOW_URL = "https://default954de6331f8d4240be8ee43a167264.5d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/20/workflows/bb7e2b13ec654f24b352b5b6722a03b7/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=WfAslxCEtRcgw8K_PeiLZ50qYVbyVMyAAX_DkRdwNmY";
+
+  let LISTAS = {}, ENVIO_URL = "", USUARIO = "", uid = 0, tipoActual = "";
+
+  // ---------- DEFINICIÓN DE PREGUNTAS (todas obligatorias) ----------
+  const TIPOS = ["Siembra","Evaluación","Objetivos de cultivo","Incidencia"];
+
+  const GENERAL = [
+    {k:"quienRellena", t:"¿Quién rellena?", tipo:"pick", lista:"personas", multi:1, buscar:1, otros:1},
+    {k:"rdStation", t:"RD Station", tipo:"pick", lista:"rdStations", otros:1},
+    {k:"fecha", t:"Fecha de la evaluación", tipo:"date", hoy:1},
+    {k:"cultivo", t:"Cultivo", tipo:"pick", lista:"cultivos", buscar:1, otros:1},
+    {k:"tipoEvaluacion", t:"Tipo de evaluación", tipo:"select", fija:TIPOS}
+  ];
+
+  const ENSAYO = {k:"ensayo", t:"Nombre del ensayo", tipo:"pick", lista:"ensayos", buscar:1, otros:1};
+  const UBICACION = {k:"ubicacion", t:"Ubicación", tipo:"pick", lista:"ubicaciones", buscar:1, otros:1};
+
+  const BLOQUES = {
+    "Siembra": {titulo:"Siembras", nombre:"siembra", campos:[
+      {k:"semillero", t:"Semillero", tipo:"select", lista:"semilleros"},
+      {k:"destino", t:"Destino", tipo:"pick", lista:"destinos", multi:1, buscar:1, otros:1},
+      ENSAYO,
+      {k:"tipoBandeja", t:"Tipo de bandeja", tipo:"pick", lista:"tiposBandeja", buscar:1, otros:1},
+      {k:"numBandejas", t:"Nº de bandejas", tipo:"num"},
+      {k:"comentarios", t:"Comentarios", tipo:"textarea"}
+    ]},
+    "Evaluación": {titulo:"Evaluaciones", nombre:"evaluación", campos:[
+      ENSAYO, UBICACION,
+      {k:"calidad", t:"Calidad de cultivo", tipo:"select", lista:"calidad"},
+      {k:"uniformidad", t:"Uniformidad", tipo:"select", lista:"uniformidad"},
+      {k:"sanitario", t:"Estado sanitario (Plagas/Enfermedades)", tipo:"select", lista:"sanitario"},
+      {k:"comentarios", t:"Comentarios", tipo:"textarea"},
+      {k:"puntosAccion", t:"Puntos de acción", tipo:"textarea"},
+      {k:"testigos", t:"Comportamiento de los testigos", tipo:"textarea", ayuda:"Tipo de planta: Compacta/Alta/Vegetativa/Generativa"}
+    ]},
+    "Objetivos de cultivo": {titulo:"Objetivos de cultivo", nombre:"objetivo", campos:[
+      ENSAYO,
+      {k:"distPlantas", t:"Distancia entre plantas (metros)", tipo:"num", dec:1},
+      {k:"distLineas", t:"Distancia entre líneas (metros)", tipo:"num", dec:1},
+      {k:"objPrincipal", t:"Objetivo principal del ensayo", tipo:"textarea"},
+      {k:"objSecundario", t:"Objetivo secundario del ensayo", tipo:"textarea"},
+      {k:"testigoRef", t:"Testigo/s de referencia y descripción morfológica de la planta", tipo:"textarea"},
+      {k:"agricultorRef", t:"Invernadero externo / Agricultor de referencia", tipo:"textarea"},
+      {k:"breeder", t:"Breeder responsable del ensayo", tipo:"pick", lista:"breeders", multi:1, buscar:1, otros:1},
+      {k:"fechaPlantacion", t:"Fecha de plantación", tipo:"date"},
+      {k:"fechaFinalizacion", t:"Fecha de finalización", tipo:"date"}
+    ]},
+    "Incidencia": {titulo:"Incidencias", nombre:"incidencia", campos:[
+      ENSAYO, UBICACION,
+      {k:"comentarios", t:"Comentarios", tipo:"textarea"},
+      {k:"puntosAccion", t:"Puntos de acción", tipo:"textarea"},
+      {k:"personasInvolucradas", t:"Personas involucradas", tipo:"pick", lista:"personas", multi:1, buscar:1, otros:1}
+    ]}
+  };
+
+  // ---------- UTILIDADES ----------
+  const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+  const lista = n => (LISTAS[n] || []);
+  const PLACEHOLDER = "Selecciona la respuesta";
+
+  function campoHTML(c){
+    const items = c.fija || lista(c.lista);
+    let inp = "";
+    if (c.tipo === "select") {
+      inp = `<select data-k="${c.k}"><option value="">${PLACEHOLDER}</option>` +
+            items.map(o=>`<option>${esc(o)}</option>`).join("") + `</select>`;
+    } else if (c.tipo === "pick") {
+      const n = "p" + (++uid);
+      inp = `<div class="pick" data-k="${c.k}" data-multi="${c.multi?1:0}">` +
+        `<button type="button" class="pick-head" onclick="togglePick(this)"><span class="pick-val vacio">${PLACEHOLDER}</span><span class="chev">▾</span></button>` +
+        `<div class="pick-panel hidden">` +
+          (c.buscar ? `<input type="text" class="buscar" placeholder="🔍 Buscar en la lista..." oninput="filtrar(this)">` : "") +
+          `<div class="opts">` + items.map(o =>
+            `<label class="chk"><input type="${c.multi?'checkbox':'radio'}" name="${n}" value="${esc(o)}"><span>${esc(o)}</span></label>`).join("") + `</div>` +
+          (c.otros ? `<input type="text" class="otra" placeholder="Otro: escríbelo a mano${c.multi?' (separa con comas)':''}">` : "") +
+        `</div></div>`;
+    } else if (c.tipo === "date") {
+      const v = c.hoy ? new Date().toISOString().slice(0,10) : "";
+      inp = `<input type="date" data-k="${c.k}" value="${v}">`;
+    } else if (c.tipo === "num") {
+      inp = `<input type="text" data-k="${c.k}" data-num="${c.dec?'dec':'int'}" inputmode="${c.dec?'decimal':'numeric'}" placeholder="${c.dec?'Ej: 0.45':'Solo números'}">`;
+    } else if (c.tipo === "textarea") {
+      inp = `<textarea data-k="${c.k}" placeholder="Escriba su respuesta"></textarea>`;
+    } else {
+      inp = `<input type="text" data-k="${c.k}" placeholder="Escriba su respuesta">`;
+    }
+    return `<label class="l">${esc(c.t)} *</label>` + (c.ayuda ? `<div class="help">${esc(c.ayuda)}</div>` : "") + inp;
+  }
+
+  // Abrir / cerrar lista desplegable (solo una abierta a la vez)
+  function togglePick(btn){
+    const pick = btn.closest(".pick");
+    const abrir = !pick.classList.contains("abierto");
+    document.querySelectorAll(".pick.abierto").forEach(p => cerrarPick(p));
+    if (abrir) {
+      pick.classList.add("abierto");
+      pick.querySelector(".pick-panel").classList.remove("hidden");
+    }
+  }
+  function cerrarPick(p){
+    p.classList.remove("abierto");
+    p.querySelector(".pick-panel").classList.add("hidden");
+  }
+  function resumen(pick){
+    const v = valor(pick);
+    const txt = Array.isArray(v) ? v.join(", ") : v;
+    const s = pick.querySelector(".pick-val");
+    s.textContent = txt || PLACEHOLDER;
+    s.classList.toggle("vacio", !txt);
+  }
+
+  function filtrar(inp){
+    const q = inp.value.toLowerCase();
+    inp.closest(".pick").querySelectorAll(".opts .chk").forEach(l => {
+      l.style.display = l.textContent.toLowerCase().includes(q) ? "" : "none";
+    });
+  }
+
+  function valor(el){
+    if (el.classList.contains("pick")) {
+      const sel = [...el.querySelectorAll(".opts input:checked")].map(x => x.value);
+      const o = (el.querySelector(".otra")?.value || "").trim();
+      if (el.dataset.multi === "1") {
+        return sel.concat(o ? o.split(",").map(s=>s.trim()).filter(Boolean) : []);
+      }
+      return o || sel[0] || "";
+    }
+    let v = el.value.trim();
+    if (el.dataset.num === "dec") v = v.replace(",", ".");
+    return v;
+  }
+
+  function recoger(cont){
+    const out = {};
+    cont.querySelectorAll("[data-k]").forEach(el => { out[el.dataset.k] = valor(el); });
+    return out;
+  }
+
+  document.addEventListener("change", e => {
+    const t = e.target, pick = t.closest(".pick");
+    if (t.matches(".pick input[type=radio]")) {
+      const o = pick.querySelector(".otra"); if (o) o.value = "";
+      resumen(pick); cerrarPick(pick);          // opción única: se cierra al elegir
+    } else if (t.matches(".pick input[type=checkbox]")) {
+      resumen(pick);
+    }
+    if (t.matches("#general select[data-k=tipoEvaluacion]")) cambioTipo(t);
+  });
+  document.addEventListener("input", e => {
+    const t = e.target;
+    if (t.classList.contains("otra")) {
+      const pick = t.closest(".pick");
+      if (pick.dataset.multi === "0") pick.querySelectorAll("input[type=radio]").forEach(r => r.checked = false);
+      resumen(pick);
+    }
+  });
+
+  function esValido(el){
+    const v = valor(el);
+    let ok = Array.isArray(v) ? v.length > 0 : v !== "";
+    if (ok && el.dataset.num === "dec") ok = /^\d+(\.\d+)?$/.test(v);
+    if (ok && el.dataset.num === "int") ok = /^\d+$/.test(v);
+    return ok;
+  }
+  function refrescar(){
+    document.querySelectorAll("#app [data-k]").forEach(el => {
+      const ok = esValido(el);
+      el.classList.toggle("f-lleno", ok);
+      el.classList.toggle("f-vacio", !ok);
+      if (ok) el.classList.remove("err");
+    });
+  }
+
+  // ---------- BLOQUES SEGÚN TIPO DE EVALUACIÓN ----------
+  function tieneDatos(){
+    return [...document.querySelectorAll("#bloques [data-k]")].some(el => {
+      const v = valor(el); return Array.isArray(v) ? v.length > 0 : v !== "";
+    });
+  }
+
+  function cambioTipo(sel){
+    const nuevo = sel.value;
+    if (tipoActual && tieneDatos() &&
+        !confirm("Al cambiar el tipo se borrarán los datos ya rellenados del bloque anterior. ¿Continuar?")) {
+      sel.value = tipoActual; return;
+    }
+    tipoActual = nuevo;
+    renderBloque();
+  }
+
+  function renderBloque(){
+    const cont = document.getElementById("bloques");
+    if (!tipoActual) { cont.innerHTML = ""; return; }
+    const B = BLOQUES[tipoActual];
+    cont.innerHTML = `<div class="card"><h2>${esc(B.titulo)}</h2><div id="entradas"></div>
+      <button class="full" onclick="anadirEntrada()">+ Añadir ${esc(B.nombre)}</button></div>`;
+    anadirEntrada();
+  }
+
+  function anadirEntrada(){
+    const B = BLOQUES[tipoActual];
+    const div = document.createElement("div");
+    div.className = "entrada";
+    div.innerHTML = `<div class="head"><b class="tit"></b><button class="del" onclick="quitarEntrada(this)">Quitar</button></div>` +
+                    B.campos.map(campoHTML).join("");
+    document.getElementById("entradas").appendChild(div);
+    refrescar();
+    numerar();
+    if (document.querySelectorAll(".entrada").length > 1) div.scrollIntoView({behavior:"smooth", block:"start"});
+  }
+
+  function quitarEntrada(btn){
+    if (document.querySelectorAll(".entrada").length <= 1) return;
+    if (!confirm("¿Quitar este registro?")) return;
+    btn.closest(".entrada").remove();
+    numerar();
+  }
+
+  function numerar(){
+    const B = BLOQUES[tipoActual];
+    const n = document.querySelectorAll(".entrada");
+    n.forEach((el, i) => {
+      el.querySelector(".tit").textContent = B.nombre.charAt(0).toUpperCase() + B.nombre.slice(1) + " " + (i+1);
+      el.querySelector(".del").style.display = n.length > 1 ? "" : "none";
+    });
+  }
+
+  // ---------- LOGIN ----------
+  async function entrar(){
+    const user = document.getElementById("user").value.trim().toLowerCase();
+    const pass = document.getElementById("pass").value.trim();
+    const msg = document.getElementById("loginMsg");
+    const btn = document.getElementById("btnEntrar");
+    msg.className = "msg"; msg.textContent = "";
+    if (!user || !pass) { msg.className = "msg error"; msg.textContent = "Escribe usuario y contraseña."; return; }
+    btn.disabled = true; btn.textContent = "Comprobando...";
+    try {
+      const sep = FLOW_URL.includes("?") ? "&" : "?";
+      const resp = await fetch(FLOW_URL + sep + "usuario=" + encodeURIComponent(user) + "&password=" + encodeURIComponent(pass));
+      if (resp.status === 401) throw new Error("Usuario o contraseña incorrectos.");
+      if (!resp.ok) throw new Error("Error del servidor (" + resp.status + ").");
+      const data = await resp.json();
+      USUARIO = user;
+      LISTAS = data.listas || {};
+      ENVIO_URL = data.envioUrl || "";
+      iniciarApp();
+    } catch (e) {
+      msg.className = "msg error";
+      msg.textContent = e.message === "Failed to fetch" ? "No se pudo conectar con el flujo." : e.message;
+    } finally {
+      btn.disabled = false; btn.textContent = "Entrar";
+    }
+  }
+
+  function iniciarApp(){
+    tipoActual = "";
+    document.getElementById("generalCampos").innerHTML = GENERAL.map(campoHTML).join("");
+    document.getElementById("bloques").innerHTML = "";
+    document.getElementById("envMsg").innerHTML = "";
+    document.getElementById("login").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+    refrescar(); window.scrollTo({top:0});
+  }
+
+  // ---------- VALIDAR Y ENVIAR ----------
+  function validar(){
+    let primero = null;
+    document.querySelectorAll(".err").forEach(e => e.classList.remove("err"));
+    document.querySelectorAll("#app [data-k]").forEach(el => {
+      const v = valor(el);
+      let mal = Array.isArray(v) ? v.length === 0 : v === "";
+      if (!mal && el.dataset.num === "dec") mal = !/^\d+(\.\d+)?$/.test(v);
+      if (!mal && el.dataset.num === "int") mal = !/^\d+$/.test(v);
+      if (mal) { el.classList.add("err"); primero = primero || el; }
+    });
+    if (primero) primero.scrollIntoView({behavior:"smooth", block:"center"});
+    return !primero;
+  }
+
+  // ---------- CORREO (independiente del flujo 2, estilo mailto) ----------
+  const CORREO_DESTINO = "";            // 👈 opcional: pon aquí el correo destinatario, o déjalo vacío
+  const ASUNTO = "Evaluaciones de cultivo";
+
+  function datosCorreo(){
+    return {
+      usuario: USUARIO,
+      general: recoger(document.getElementById("general")),
+      registros: [...document.querySelectorAll(".entrada")].map(recoger)
+    };
+  }
+  const aTexto = v => Array.isArray(v) ? v.join(", ") : String(v == null ? "" : v);
+
+  function tablaHtml(p){
+    const th = "padding:8px 10px;border:1px solid #cfcfc6;background:#51758a;color:#ffffff;text-align:left;font-size:13px";
+    const td = "padding:8px 10px;border:1px solid #cfcfc6;font-size:13px;vertical-align:top";
+    const tdk = td + ";background:#f3f1e8;font-weight:bold;width:32%";
+    const fmt = v => aTexto(v).split("\n").map(esc).join("<br>");
+    const tit = t => `<h3 style="font-family:Arial,sans-serif;color:#4a3b38;margin:22px 0 8px">${esc(t)}</h3>`;
+    const B = BLOQUES[tipoActual], cap = B.nombre.charAt(0).toUpperCase() + B.nombre.slice(1);
+    return `<div style="font-family:Arial,sans-serif;color:#4a3b38">` + tit("Datos generales") +
+      `<table style="border-collapse:collapse;width:100%"><tr><th style="${th}">Pregunta</th><th style="${th}">Respuesta</th></tr>` +
+      GENERAL.map(c => `<tr><td style="${tdk}">${esc(c.t)}</td><td style="${td}">${fmt(p.general[c.k])}</td></tr>`).join("") +
+      `<tr><td style="${tdk}">Usuario</td><td style="${td}">${esc(p.usuario)}</td></tr></table>` + tit(B.titulo) +
+      `<table style="border-collapse:collapse;width:100%"><tr><th style="${th}">Pregunta</th>` +
+      p.registros.map((r, i) => `<th style="${th}">${esc(cap)} ${i + 1}</th>`).join("") + `</tr>` +
+      B.campos.map(c => `<tr><td style="${tdk}">${esc(c.t)}</td>` + p.registros.map(r => `<td style="${td}">${fmt(r[c.k])}</td>`).join("") + `</tr>`).join("") +
+      `</table></div>`;
+  }
+
+  function tablaTexto(p){
+    const B = BLOQUES[tipoActual], cap = B.nombre.charAt(0).toUpperCase() + B.nombre.slice(1);
+    const fila = (k, v) => k + " | " + aTexto(v).replace(/\s*\n\s*/g, " / ");
+    let t = "DATOS GENERALES\n" + GENERAL.map(c => fila(c.t, p.general[c.k])).join("\n") + "\n" + fila("Usuario", p.usuario) + "\n";
+    p.registros.forEach((r, i) => {
+      t += "\n" + B.titulo.toUpperCase() + " - " + cap + " " + (i + 1) + "\n" + B.campos.map(c => fila(c.t, r[c.k])).join("\n") + "\n";
+    });
+    return t;
+  }
+
+  async function redactarCorreo(){
+    const msg = document.getElementById("envMsg");
+    msg.className = "msg";
+    if (!validar()) { msg.className = "msg error"; msg.textContent = "Revisa los campos en rojo antes de redactar el correo."; return; }
+    const p = datosCorreo(), texto = tablaTexto(p), html = tablaHtml(p);
+
+    // Copia la tabla con formato al portapapeles (por si el cuerpo es largo). Se lanza antes de abrir el correo.
+    let copiado = false;
+    try {
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/html": new Blob([html], {type: "text/html"}),
+        "text/plain": new Blob([texto], {type: "text/plain"})
+      })]);
+      copiado = true;
+    } catch (e) {
+      try { await navigator.clipboard.writeText(texto); copiado = true; } catch (e2) {}
+    }
+
+    const LIMITE = 1800;   // los enlaces mailto largos fallan en muchos clientes
+    let cuerpo = texto, largo = false;
+    if (encodeURIComponent(texto).length > LIMITE) {
+      largo = true;
+      cuerpo = copiado ? "Pega aquí la tabla (ya está copiada en el portapapeles).\n" : "";
+    }
+    const url = "mailto:" + encodeURIComponent(CORREO_DESTINO) + "?subject=" + encodeURIComponent(ASUNTO) +
+                "&body=" + encodeURIComponent(cuerpo).replace(/%0A/g, "%0D%0A");
+    window.location.href = url;
+
+    msg.className = "msg ok";
+    msg.textContent = largo
+      ? (copiado ? "Se abre tu correo. La tabla es larga: está copiada, pégala en el cuerpo del mensaje."
+                 : "Se abre tu correo, pero la tabla es larga y no se pudo copiar. Usa el botón Enviar.")
+      : "Se abre tu aplicación de correo con la tabla en el cuerpo.";
+  }
+
+  async function enviar(){
+    const msg = document.getElementById("envMsg");
+    const btn = document.getElementById("btnEnviar");
+    msg.className = "msg";
+    if (!validar()) { msg.className = "msg error"; msg.textContent = "Revisa los campos en rojo: todos son obligatorios y los numéricos solo admiten números/decimales."; return; }
+    if (!ENVIO_URL) { msg.className = "msg error"; msg.textContent = "El flujo no ha devuelto la URL de envío."; return; }
+
+    const payload = {
+      usuario: USUARIO,
+      general: recoger(document.getElementById("general")),
+      registros: [...document.querySelectorAll(".entrada")].map(recoger),
+      enviadoEn: new Date().toISOString()
+    };
+
+    btn.disabled = true; btn.textContent = "Enviando...";
+    try {
+      const resp = await fetch(ENVIO_URL, {
+        method: "POST",
+        headers: {"Content-Type": "text/plain"},   // evita la comprobación previa CORS
+        body: JSON.stringify(payload)
+      });
+      if (!resp.ok) throw new Error("Error al enviar (" + resp.status + ").");
+      msg.className = "msg ok";
+      msg.innerHTML = "✔ Enviado correctamente (" + payload.registros.length + " registro/s)." +
+        `<br><button style="margin-top:12px" onclick="iniciarApp()">Nuevo formulario</button>`;
+    } catch (e) {
+      msg.className = "msg error";
+      msg.textContent = e.message === "Failed to fetch" ? "No se pudo enviar. Revisa la conexión y vuelve a intentarlo." : e.message;
+    } finally {
+      btn.disabled = false; btn.textContent = "Enviar";
+    }
+  }
+
+  document.addEventListener("input", refrescar);
+  document.addEventListener("change", refrescar);
+  document.getElementById("user").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("pass").focus(); });
+  document.getElementById("pass").addEventListener("keydown", e => { if (e.key === "Enter") entrar(); });
+</script>
+</body>
+</html>
