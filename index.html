@@ -10248,11 +10248,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     {k:"quienRellena", t:"¿Quién rellena?", tipo:"pick", lista:"personas", multi:1, buscar:1, otros:1},
     {k:"rdStation", t:"RD Station", tipo:"pick", lista:"rdStations", otros:1},
     {k:"fecha", t:"Fecha de la evaluación", tipo:"date", hoy:1},
-    {k:"cultivo", t:"Cultivo", tipo:"pick", lista:"cultivos", buscar:1, otros:1},
     {k:"tipoEvaluacion", t:"Tipo de evaluación", tipo:"select", fija:TIPOS}
   ];
 
   const ENSAYO = {k:"ensayo", t:"Nombre del ensayo", tipo:"pick", lista:"ensayos", buscar:1, otros:1, qr:1};
+  const ENSAYO_VARIOS = Object.assign({}, ENSAYO, {multi:1, ayuda:"Puedes elegir varios ensayos: se enviará un registro por cada uno, con las mismas respuestas."});
   const UBICACION = {k:"ubicacion", t:"Ubicación", tipo:"pick", lista:"ubicaciones", buscar:1, otros:1, qr:1};
 
   const BLOQUES = {
@@ -10265,7 +10265,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       {k:"comentarios", t:"Comentarios", tipo:"textarea"}
     ]},
     "Evaluación": {titulo:"Evaluaciones", nombre:"evaluación", campos:[
-      ENSAYO, UBICACION,
+      ENSAYO_VARIOS, UBICACION,
       {k:"calidad", t:"Calidad de cultivo", tipo:"select", lista:"calidad"},
       {k:"uniformidad", t:"Uniformidad", tipo:"select", lista:"uniformidad"},
       {k:"sanitario", t:"Estado sanitario (Plagas/Enfermedades)", tipo:"select", lista:"sanitario"},
@@ -10274,7 +10274,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       {k:"testigos", t:"Comportamiento de los testigos", tipo:"textarea", ayuda:"Tipo de planta: Compacta/Alta/Vegetativa/Generativa"}
     ]},
     "Objetivos de cultivo": {titulo:"Objetivos de cultivo", nombre:"objetivo", campos:[
-      ENSAYO,
+      ENSAYO_VARIOS,
       {k:"distPlantas", t:"Distancia entre plantas (metros)", tipo:"num", dec:1},
       {k:"distLineas", t:"Distancia entre líneas (metros)", tipo:"num", dec:1},
       {k:"objPrincipal", t:"Objetivo principal del ensayo", tipo:"textarea"},
@@ -10669,36 +10669,71 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     }
   }
 
+  // ---------- ENVÍO AL FLUJO 2: UN MENSAJE POR ENSAYO ----------
+  let envioPend = null;   // estado de un envío interrumpido, para reintentar solo lo que falta
+
+  function construirMensajes(){
+    const general = recoger(document.getElementById("general"));
+    const out = [];
+    [...document.querySelectorAll(".entrada")].map(recoger).forEach((r, i) => {
+      const ensayos = Array.isArray(r.ensayo) ? r.ensayo : [r.ensayo];
+      const datos = Object.assign({}, r); delete datos.ensayo;
+      ensayos.forEach(e => out.push({
+        usuario: USUARIO, tipoEvaluacion: general.tipoEvaluacion, general: general,
+        ensayo: e, registro: i + 1, datos: datos
+      }));
+    });
+    return out;
+  }
+
+  async function postFlujo(obj){
+    for (let intento = 1; intento <= 2; intento++) {
+      try {
+        const resp = await fetch(ENVIO_URL, {
+          method: "POST",
+          headers: {"Content-Type": "text/plain"},   // evita la comprobación previa CORS
+          body: JSON.stringify(obj)
+        });
+        if (resp.ok) return true;
+      } catch (e) {}
+    }
+    return false;
+  }
+
   async function enviar(){
     const msg = document.getElementById("envMsg");
+    const botones = document.querySelectorAll("#btnEnviar,#btnCorreo");
     const btn = document.getElementById("btnEnviar");
     msg.className = "msg";
     if (!validar()) { msg.className = "msg error"; msg.textContent = "Revisa los campos en rojo: todos son obligatorios y los numéricos solo admiten números/decimales."; return; }
     if (!ENVIO_URL) { msg.className = "msg error"; msg.textContent = "El flujo no ha devuelto la URL de envío."; return; }
 
-    const payload = {
-      usuario: USUARIO,
-      general: recoger(document.getElementById("general")),
-      registros: [...document.querySelectorAll(".entrada")].map(recoger),
-      enviadoEn: new Date().toISOString()
-    };
-
-    btn.disabled = true; btn.textContent = "Enviando...";
+    const msgs = construirMensajes(), sig = JSON.stringify(msgs);
+    if (!envioPend || envioPend.sig !== sig) {
+      envioPend = {sig: sig, hechos: 0, total: msgs.length,
+                   lote: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+                   enviadoEn: new Date().toISOString()};
+    }
+    botones.forEach(x => x.disabled = true);
     try {
-      const resp = await fetch(ENVIO_URL, {
-        method: "POST",
-        headers: {"Content-Type": "text/plain"},   // evita la comprobación previa CORS
-        body: JSON.stringify(payload)
-      });
-      if (!resp.ok) throw new Error("Error al enviar (" + resp.status + ").");
+      for (let i = envioPend.hechos; i < msgs.length; i++) {
+        btn.textContent = "Enviando " + (i + 1) + " de " + msgs.length + "…";
+        const ok = await postFlujo(Object.assign({}, msgs[i], {
+          loteId: envioPend.lote, n: i + 1, total: msgs.length, enviadoEn: envioPend.enviadoEn}));
+        if (!ok) {
+          msg.className = "msg error";
+          msg.textContent = "Enviados " + envioPend.hechos + " de " + msgs.length + ". Falló el envío de «" + msgs[i].ensayo +
+            "». Revisa la conexión y pulsa Enviar para reintentar solo los que faltan (no modifiques el formulario).";
+          return;
+        }
+        envioPend.hechos = i + 1;
+      }
+      envioPend = null;
       msg.className = "msg ok";
-      msg.innerHTML = "✔ Enviado correctamente (" + payload.registros.length + " registro/s)." +
+      msg.innerHTML = "✔ Enviado correctamente (" + msgs.length + " ensayo/s, uno a uno)." +
         `<br><button style="margin-top:12px" onclick="iniciarApp()">Nuevo formulario</button>`;
-    } catch (e) {
-      msg.className = "msg error";
-      msg.textContent = e.message === "Failed to fetch" ? "No se pudo enviar. Revisa la conexión y vuelve a intentarlo." : e.message;
     } finally {
-      btn.disabled = false; btn.textContent = "Enviar";
+      botones.forEach(x => x.disabled = false); btn.textContent = "Enviar";
     }
   }
 
