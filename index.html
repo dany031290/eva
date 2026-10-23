@@ -10145,7 +10145,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
   button.pick-head{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;
     font-size:15px;font-weight:400;padding:13px 14px;background:var(--field);color:var(--ink)}
   button.pick-head:hover{filter:none}
-  .pick-val{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pick-val{flex:1;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.35;text-align:left}
   .pick-val.vacio{color:#a3998f}
   .chev{color:var(--teal);font-size:14px;transition:transform .15s}
   .pick.abierto .chev{transform:rotate(180deg)}
@@ -10344,7 +10344,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
   }
   function resumen(pick){
     const v = valor(pick);
-    const txt = Array.isArray(v) ? v.join(", ") : v;
+    const txt = Array.isArray(v) ? v.join("\n") : v;
     const s = pick.querySelector(".pick-val");
     s.textContent = txt || PLACEHOLDER;
     s.classList.toggle("vacio", !txt);
